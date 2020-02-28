@@ -1,7 +1,13 @@
 import pymongo
 import subprocess
 import pprint
+import os
 from pymongo import MongoClient
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+
+choice = None
 
 cluster = MongoClient(
     "mongodb://admin:admin@cluster0-shard-00-00-whyp1.mongodb.net:27017,cluster0-shard-00-01-whyp1.mongodb.net:27017,"
@@ -11,24 +17,76 @@ db = cluster["datasets"]
 collection = db["student_data"]
 
 
-def find():
-    key = input("Key to search: ").lower()
-    value = input("Value to search: ").lower()
-    filterlist = {key: value}
+def checkkeys():
+    try:
+        sorted(db.student_data.find_one())
+    except TypeError:
+        print("No keys found")
+        exit()
 
-    results = collection.find(filterlist)
 
+checkkeys()
+keys = sorted(db.student_data.find_one())
+
+
+def edit():
+    toedit = input("ID of document to edit: ")
+    results = collection.find({"_id": toedit})
     for result in results:
         pprint.pprint(result)
 
+    edkey = input("\nKey of value to edit: ")
+    edval = input("Value to change to: ")
+    collection.find_one_and_update(
+        {"_id": toedit},
+        {"$set":
+             {edkey: edval}
+         }, upsert=True
+    )
+
+    results = collection.find({"_id": toedit})
+    for result in results:
+        pprint.pprint(result)
+
+    print("\nThe change was successful")
+
+
+def find():
+    key = input("\nKey to search: ").lower()
+    if key in keys:
+        value = input("Value to search: ").lower()
+        filterlist = {key: value}
+
+        results = collection.find(filterlist)
+        print(results)
+
+        if results == " ":
+            print("None found, please try again")
+            find()
+        else:
+            for result in results:
+                pprint.pprint(result)
+                print("\n")
+
+    else:
+        print("Please try again")
+        find()
+
 
 def add():
-    keys = sorted(db.student_data.find_one())
+    print("\nFill in the values or type \"reset\" at any time to reset")
     values = []
+    length = len(keys)
+    k = 0
 
-    for k in keys:
-        value = input(k + "?: ")
-        values.append(value)
+    while k < length:
+        value = input(keys[k].capitalize() + "?: ").lower()
+        if value != "back":
+            values.append(value)
+            k += 1
+        else:
+            k -= 1
+            values = values[:-1]
 
     joint = dict(zip(keys, values))
     pprint.pprint(joint)
@@ -46,22 +104,26 @@ def add():
 
 
 def delete():
-    print("Please note ID if you'd like to delete one or key to delete many")
+    print("\nIf deleting ONE, note ID. If deleting MANY, note key and value.")
     find()
-    choice = input("would you like to delete one or many?: ")
+    delchoice = input("\nWould you like to delete one, many or all?: ")
 
-    if choice == "one":
+    if delchoice == "one":
         delval = input("Please enter the ID of the document to delete: ").lower()
         query = {"_id": delval}
         collection.delete_one(query)
-        print("Deleted succesfully")
+        print("One deleted succesfully")
 
-    elif choice == "many":
+    elif delchoice == "many":
         delkey = input("Key to delete?: ")
         delval = input("Value to delete?: ")
         query = {delkey: delval}
         collection.delete_many(query)
-        print("Deleted succesfully")
+        print("Many deleted successfully")
+
+    elif delchoice == "all":
+        collection.delete_many({})
+        print("All deleted successfully")
 
     else:
         print("Please try again")
@@ -69,16 +131,19 @@ def delete():
 
 
 def start():
-    choice = input("What would you like to do?: ").lower()
-    if choice == "add":
+    starchoice = input("\nWhat would you like to do?: ").lower()
+    if starchoice == "add":
         add()
-    elif choice == "find":
+    elif starchoice == "find":
         find()
-    elif choice == "delete":
+    elif starchoice == "delete":
         delete()
+    elif starchoice == "edit":
+        edit()
     else:
         print("Please try again")
         start()
 
 
-start()
+while choice != "exit":
+    start()
